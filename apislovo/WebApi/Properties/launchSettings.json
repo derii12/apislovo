@@ -25,15 +25,16 @@
       "commandName": "Project",
       "launchBrowser": true,
       "launchUrl": "swagger",
+      "applicationUrl": "https://localhost:5001;http://localhost:5000",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "https://localhost:5001;http://localhost:5000"
+      }
     },
     "newProfile1": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "launchUrl": "swagger"
+      "launchUrl": "swagger",
+      "environmentVariables": {}
     }
   }
 }
