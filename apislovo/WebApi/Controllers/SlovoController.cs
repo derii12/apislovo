@@ -325,7 +325,7 @@ namespace WebApi.Controllers
                     Post friendpostother = UsersDTO.LoadUserPost(find_friends[i].id); //gettin i's friend post by friend id
                     if (friendpostother.id != null) 
                     {
-                        find_post_res_info = find_post_res_info + "~" + friendpostother.post_text + "|" + UsersDTO.GetUsersById(friendpostother.id).username; //getting information about post and adding it to string
+                        find_post_res_info = find_post_res_info + "~" + friendpostother.post_text + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak; //getting information about post and adding it to string
                         find_post_res_time = find_post_res_time + "|" + PostLeftSecods(friendpostother.post_time); //getting seconds, how much post will be alive
                     }
                     else

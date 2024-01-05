@@ -24,6 +24,8 @@ namespace WebApi
         public string confirmation_code { get; set; }
 
         public string invite_code { get; set; }
+
+        public string streak { get; set; }
     }
 
     public class Post
@@ -246,6 +248,35 @@ namespace WebApi
                             res.username = sdr["username"].ToString();
                             res.phone = sdr["phone"].ToString();
                             res.confirmation_code = sdr["confirm_code"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return res;
+        }
+
+        public static User GetUsersStreak(string uid)
+        {
+            User res = new User();
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.GET_USER_STREAK @uid=" + uid + ";";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            res.streak = sdr["streak_count"].ToString();
+                           
                         }
                     }
                     con.Close();
