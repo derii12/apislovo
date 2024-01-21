@@ -459,10 +459,10 @@ namespace WebApi.Controllers
                     List<User> find_users = UsersDTO.SearchPeople(encoded_token, search_stroke); //getting users, that consist entered str
                     if (find_users[0].id != "-7") //if there is some users that consists str in username
                     {
-                        string find_res = find_users[0].username; //first username,of found users
+                        string find_res = find_users[0].username + "|" + UsersDTO.FriendStatus(find_users[0].id, encoded_token).friend_status; //first username,of found users
                         for (int i = 1; i < find_users.Count; i++)
                         {
-                            find_res = find_res + ";" + find_users[i].username; //adding other found users
+                            find_res = find_res + ";" + find_users[i].username + "|" + UsersDTO.FriendStatus(find_users[i].id, encoded_token).friend_status; //adding other found users
                         }
                         return "{" + find_res + "}";//stroke of found usernasmes
                     }
