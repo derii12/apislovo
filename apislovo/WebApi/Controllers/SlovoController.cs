@@ -42,6 +42,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.Http.Extensions;
+using GraphQLParser;
+using System.Reactive.Joins;
 
 namespace WebApi.Controllers
 {
@@ -90,7 +92,7 @@ namespace WebApi.Controllers
                         dynamic request_sms_array = JsonConvert.DeserializeObject(confirmed_user);
                         string confirm_code_creating = request_sms_array["code"].ToString(); //getting confirm code
 
-                        List<User> confirm_users = UsersDTO.CreateConfirm(phone_number, confirm_code_creating); //insert new confirm for this user in database
+                        List<User> confirm_users = UsersDTO.CreateConfirm(phone_number, Tokens.GetToken(confirm_code_creating, "confirm")); //insert new confirm for this user in database
 
                         return "found";
                     }
@@ -174,13 +176,14 @@ namespace WebApi.Controllers
         {
             bool isAlpha_phone = phone_number.All(Char.IsDigit); /*проверка данных на соотвествие*/
             bool isAlpha_username = Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$"); //checking username for format
+            bool isAlpha_invitecode = Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$"); //checking username for format
             bool isAlpha_username_digit = username.All(Char.IsDigit); /*проверка данных на соотвествие*/
-            if (isAlpha_phone && isAlpha_username && isAlpha_username_digit == false) //checking data for wrong format
+            if (isAlpha_invitecode && isAlpha_phone && isAlpha_username && isAlpha_username_digit == false) //checking data for wrong format
             {
                 string newinviter = RandomString(10); //generating new invite_code
 
                 string confirm_code_creating = "register";
-                List<User> users = UsersDTO.InsertUser(phone_number, username, invitecode, newinviter, confirm_code_creating); //пытаемся записать нового пользователя и получить его id
+                List<User> users = UsersDTO.InsertUser(phone_number, username.ToLower(), invitecode, newinviter, confirm_code_creating); //пытаемся записать нового пользователя и получить его id
 
                 string inserted_user = users[0].id;
                 if (Convert.ToInt64(inserted_user) > 0) //если пользователь внесен в бд, и код приглашения существует, то отправляем смс для подтверждения номера
@@ -194,7 +197,7 @@ namespace WebApi.Controllers
                         dynamic request_sms_array = JsonConvert.DeserializeObject(confirmed_user); //getting json answer 
                         string new_confirm_code_creating = request_sms_array["code"].ToString();//selecting confirmation string code
 
-                        List<User> confirm_users = UsersDTO.CreateConfirm(phone_number, new_confirm_code_creating); //insert new confirm code in database for this user
+                        List<User> confirm_users = UsersDTO.CreateConfirm(phone_number, Tokens.GetToken(new_confirm_code_creating, "confirm")); //insert new confirm code in database for this user
 
                         return "success";
                     }
@@ -227,14 +230,14 @@ namespace WebApi.Controllers
 
                 string user_ip = GetUserIp().Result; //getting user ipadress
 
-                List<User> users = UsersDTO.ConfirmUser(phone_number, confirm_code, user_ip);
+                List<User> users = UsersDTO.ConfirmUser(phone_number, Tokens.GetToken(confirm_code, "confirm"), user_ip);
 
 
 
                 string inserted_user = users[0].id;
                 if (Convert.ToInt64(inserted_user) > 0)
                 {
-                    string token = Tokens.GetToken(inserted_user); //создание токена для этого пользователя
+                    string token = Tokens.GetToken(inserted_user, "auth"); //создание токена для этого пользователя
 
                     // string encoded_token = Tokens.GetName(token); расшифровка токена для этого пользователя
                     return token;
@@ -255,7 +258,7 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); //get encoded token (user id)
+                string encoded_token = Tokens.GetName(token,"auth"); //get encoded token (user id)
                 User person = UsersDTO.GetUsersById(encoded_token); //geting info about user
                 User pesoncode = UsersDTO.LoadUserInvite(encoded_token); //getting invite code for this user
                 return person.username + ";" + pesoncode.invite_code;
@@ -274,9 +277,30 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); //get encoded token (user id)
-                Post new_post = UsersDTO.NewUserPost(encoded_token, post_text); //creating new post for this user (new post text)
-                return "success"; // post created succesfull
+                    string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+
+
+                     string post_txt_token = "";
+                int amount = 0;
+
+                if (post_text != "" && post_text != null)
+                {
+                    amount = post_text.Split('\n').Length - 1;
+                    char[] charsToTrim = { '\n', '\'' };
+                    string post_text_actual = post_text.Trim(charsToTrim);
+                    post_txt_token = Tokens.GetToken(post_text_actual, "post");
+                }
+                if (amount < 7)
+                {
+                    Post new_post = UsersDTO.NewUserPost(encoded_token, post_txt_token); //creating new post for this user (new post text)
+                    return "success"; // post created succesfull
+                }
+                else
+                {
+                    return "too much line breaks!";
+                }
+
+                 
                 // int got_username = Convert.ToInt32(person.username);
             }
             catch
@@ -304,10 +328,27 @@ namespace WebApi.Controllers
         public string load_post(string token) //load autor's post
         {
                 string a = refresh();
-                string encoded_token = Tokens.GetName(token); // get encoded token(user id)
+            try
+            {
+                string encoded_token = Tokens.GetName(token,"auth"); // get encoded token(user id)
                 Post post = UsersDTO.LoadUserPost(encoded_token); // load post info by uesr id
-                return "{"+post.post_text + ";" + PostLeftSecods(post.post_time) + "}"; //sending request about user post information
-                // int got_username = Convert.ToInt32(person.username);
+                string uncoded_txt;
+                if (post.post_text == null)
+                {
+                    uncoded_txt = "";
+                }
+                else
+                {
+                    uncoded_txt = Tokens.GetName(post.post_text, "post");
+                }
+
+                return "{" + uncoded_txt + ";" + PostLeftSecods(post.post_time) + "}"; //sending request about user post information
+                                                                                          // int got_username = Convert.ToInt32(person.username);
+            }
+            catch
+            {
+                return "-1";
+            }
         }
 
         [HttpGet("load_friends_posts")]
@@ -315,17 +356,17 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); //get encoded token(id)
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token(id)
                 List<User> find_friends = UsersDTO.LoadFriends(encoded_token); //getting all friends of this user
                 Post friendpost = UsersDTO.LoadUserPost(find_friends[0].id);//trying to get post of first friend in the list
                 string find_post_res_info = ""; //information of post string(post text, author, streak)
                 string find_post_res_time = ""; // information of post time (how much seconds post will be alive)
                 for (int i = 0; i < find_friends.Count; i++)//checking for another friends post 
                 {
-                    Post friendpostother = UsersDTO.LoadUserPost(find_friends[i].id); //gettin i's friend post by friend id
+                    Post friendpostother = UsersDTO.LoadUserPost(find_friends[i].id); //getting i's friend post by friend id
                     if (friendpostother.id != null) 
                     {
-                        find_post_res_info = find_post_res_info + "~" + friendpostother.post_text + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak; //getting information about post and adding it to string
+                        find_post_res_info = find_post_res_info + "~" + Tokens.GetName(friendpostother.post_text, "post") + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak; //getting information about post and adding it to string
                         find_post_res_time = find_post_res_time + "|" + PostLeftSecods(friendpostother.post_time); //getting seconds, how much post will be alive
                     }
                     else
@@ -357,16 +398,21 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); //get encoded token (user id)
-                List<User> find_users = UsersDTO.AddFriend(encoded_token, username); //adding friend with this username
-                if (find_users[0].id != "-2" && find_users[0].id != "-1") //checking for adding errrors
+                bool isAlpha_username = Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$");
+                if (isAlpha_username)
                 {
-                    return "success";
+                    string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+                    List<User> find_users = UsersDTO.AddFriend(encoded_token, username); //adding friend with this username
+                    if (find_users[0].id != "-2" && find_users[0].id != "-1") //checking for adding errrors
+                    {
+                        return "success";
+                    }
+                    else
+                    {
+                        return "notfound"; //there no user in database with this username
+                    }
                 }
-                else
-                {
-                    return "notfound"; //there no user in database with this username
-                }
+                return "error";
             }
             catch
             {
@@ -381,10 +427,11 @@ namespace WebApi.Controllers
             bool isAlpha_newusername= new_username.All(Char.IsDigit); // checking if new username consist only digits
             if (isAlpha_username && new_username.Length>3 && isAlpha_newusername == false) //checking new usernmae for format
             {
+
                 try
                 {
-                    string encoded_token = Tokens.GetName(token); // get uncoded token(user id)
-                    List<User> edit_username = UsersDTO.EditUsername(encoded_token, new_username);//editing username to new
+                    string encoded_token = Tokens.GetName(token, "auth"); // get uncoded token(user id)
+                    List<User> edit_username = UsersDTO.EditUsername(encoded_token, new_username.ToLower());//editing username to new
                     return edit_username[0].id; // editing status code
                 }
                 catch
@@ -404,16 +451,21 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); //get encoded token (user id)
-                List<User> find_users = UsersDTO.DeleteFriend(encoded_token, username); //deleting friend by username
-                if (find_users[0].id != "-2" && find_users[0].id != "-1") //if there is no error code
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+                bool isAlpha_username = Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$");
+                if (isAlpha_username)
                 {
-                    return "success";
+                    List<User> find_users = UsersDTO.DeleteFriend(encoded_token, username); //deleting friend by username
+                    if (find_users[0].id != "-2" && find_users[0].id != "-1") //if there is no error code
+                    {
+                        return "success";
+                    }
+                    else
+                    {
+                        return "notfound"; //there is no user with this username in database, or user is not friend of this user
+                    }
                 }
-                else
-                {
-                    return "notfound"; //there is no user with this username in database, or user is not friend of this user
-                }
+                return "error";
             }
             catch
             {
@@ -426,16 +478,21 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); //get encoded token(user id)
-                List<User> find_users = UsersDTO.AcceptFriend(encoded_token, username); //accepting friend with gotten username for this user
-                if (find_users[0].id != "-1" && find_users[0].id != "-2")//username friend in database, users are not friends yet
+                bool isAlpha_username = Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$");
+                if (isAlpha_username)
                 {
-                    return "success";
+                    string encoded_token = Tokens.GetName(token, "auth"); //get encoded token(user id)
+                    List<User> find_users = UsersDTO.AcceptFriend(encoded_token, username); //accepting friend with gotten username for this user
+                    if (find_users[0].id != "-1" && find_users[0].id != "-2")//username friend in database, users are not friends yet
+                    {
+                        return "success";
+                    }
+                    else
+                    {
+                        return "notfound"; //friend username is not in database or users are alredy friends
+                    }
                 }
-                else
-                {
-                    return "notfound"; //friend username is not in database or users are alredy friends
-                }
+                return "error";
             }
             catch
             {
@@ -447,35 +504,40 @@ namespace WebApi.Controllers
         [HttpGet("search_user")]
         public string search_user(string token, string search_stroke)//searching users by str, which username consist this str
         {
-            if (search_stroke.Contains(" ") || search_stroke.Length < 3) //checking searh stroke for format
+            bool isAlpha_search_stroke = Regex.IsMatch(search_stroke, @"^[a-zA-Z0-9_]+$");
+            if (isAlpha_search_stroke)
             {
-                return "error";
-            }
-            else
-            {
-                try
+                if (search_stroke.Contains(" ") || search_stroke.Length < 3) //checking searh stroke for format
                 {
-                    string encoded_token = Tokens.GetName(token); //get uncodedf token(user id)
-                    List<User> find_users = UsersDTO.SearchPeople(encoded_token, search_stroke); //getting users, that consist entered str
-                    if (find_users[0].id != "-7") //if there is some users that consists str in username
+                    return "error";
+                }
+                else
+                {
+                    try
                     {
-                        string find_res = find_users[0].username + "|" + UsersDTO.FriendStatus(find_users[0].id, encoded_token).friend_status; //first username,of found users
-                        for (int i = 1; i < find_users.Count; i++)
+                        string encoded_token = Tokens.GetName(token, "auth"); //get uncodedf token(user id)
+                        List<User> find_users = UsersDTO.SearchPeople(encoded_token, search_stroke); //getting users, that consist entered str
+                        if (find_users[0].id != "-7") //if there is some users that consists str in username
                         {
-                            find_res = find_res + ";" + find_users[i].username + "|" + UsersDTO.FriendStatus(find_users[i].id, encoded_token).friend_status; //adding other found users
+                            string find_res = find_users[0].username + "|" + UsersDTO.FriendStatus(find_users[0].id, encoded_token).friend_status; //first username,of found users
+                            for (int i = 1; i < find_users.Count; i++)
+                            {
+                                find_res = find_res + ";" + find_users[i].username + "|" + UsersDTO.FriendStatus(find_users[i].id, encoded_token).friend_status; //adding other found users
+                            }
+                            return "{" + find_res + "}";//stroke of found usernasmes
                         }
-                        return "{" + find_res + "}";//stroke of found usernasmes
+                        else
+                        {
+                            return "notfound"; //no users consists str in username
+                        }
                     }
-                    else
+                    catch
                     {
-                        return "notfound"; //no users consists str in username
+                        return "error"; //wrong token
                     }
-                }
-                catch
-                {
-                    return "error"; //wrong token
                 }
             }
+            return "error";
         }
 
 
@@ -484,7 +546,7 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); //get encoded token (user id)
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
                 List<User> find_friends = UsersDTO.LoadFriends(encoded_token);//getting all user's friends id
 
                 if (find_friends[0].id != "-1") //if user have some friends
@@ -512,7 +574,7 @@ namespace WebApi.Controllers
         {
             try
             {
-                string encoded_token = Tokens.GetName(token); // get encoded token(user id)
+                string encoded_token = Tokens.GetName(token, "auth"); // get encoded token(user id)
                 List<User> find_friends = UsersDTO.LoadFriendsRequests(encoded_token); //getting all users that sent request for this user
                 if (find_friends[0].id != "-1") //there is some user requests
                 {

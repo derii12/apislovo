@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace WebApi
 {
@@ -56,38 +57,63 @@ namespace WebApi
             return new SymmetricSecurityKey(Encoding.ASCII.GetBytes(KEY));
         }
     }
+
+    public class PostOptions
+    {
+        public const string ISSUER = "SlovoPostServer"; // издатель токена
+        public const string AUDIENCE = "SlovoPostClient"; // потребитель токена
+        public const string KEY = "svdiufbiweuiejruiejtuudhfudfijdgijgfkdkvkvneiouibioubweoifncncnejegheywyweuejhfbejfiweuiow3uejejdyuedbdfiweuebffghfyhrthrghert4rrtertdrtreryrert545ytw";   // ключ для шифрации
+        public const Int64 LIFETIME = 1000000; // время жизни токена
+        public static SymmetricSecurityKey GetSymmetricSecurityKey()
+        {
+            return new SymmetricSecurityKey(Encoding.ASCII.GetBytes(KEY));
+        }
+    }
     public static class Tokens
     {
 
 
-        public static string GetToken(string uid) //создаем новый токен на основе введенных параметров
+        public static string GetToken(string uid, string operation_type) //создаем новый токен на основе введенных параметров
         {
 
             //  string res =      API.SendLogin(username, password);
 
 
-            var identity = GetIdentity(uid);
-            if (identity == null)
+           var identity = GetIdentity(uid);
+          if (identity == null)
             {
                 return null;
             }
 
             var now = DateTime.UtcNow;
             // создаем JWT-токен
-            var jwt = new JwtSecurityToken(
-                    issuer: AuthOptions.ISSUER,
-                    audience: AuthOptions.AUDIENCE,
-                    notBefore: now,
-                    claims: identity.Claims, //получаем список claims из identity
-                    expires: now.Add(TimeSpan.FromMinutes(AuthOptions.LIFETIME)),
-                    signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
-
+            var jwt = new JwtSecurityToken();
+            if (operation_type == "auth")
+            {
+                jwt = new JwtSecurityToken(
+                        issuer: AuthOptions.ISSUER,
+                        audience: AuthOptions.AUDIENCE,
+                        notBefore: now,
+                        claims: identity.Claims, //получаем список claims из identity
+                        expires: now.Add(TimeSpan.FromMinutes(AuthOptions.LIFETIME)),
+                        signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
+            }
+            else
+            {
+                jwt = new JwtSecurityToken(
+                        issuer: PostOptions.ISSUER,
+                        audience: PostOptions.AUDIENCE,
+                        notBefore: now,
+                        claims: identity.Claims, //получаем список claims из identity
+                        expires: now.Add(TimeSpan.FromMinutes(PostOptions.LIFETIME)),
+                        signingCredentials: new SigningCredentials(PostOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
+            }
             var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt); // готовый токен
 
             var response = new //список состоящий из токена и имени пользователя
             {
-                access_token = encodedJwt,
-                username = identity.Name
+                access_token = encodedJwt
+            //    username = identity.Name
             };
 
             return encodedJwt.ToString(); //возвращает строку токена
@@ -95,9 +121,18 @@ namespace WebApi
 
 
 
-        public static string GetName(string token) //получаем информацию из зашифрованного токена
+        public static string GetName(string token, string operation_type) //получаем информацию из зашифрованного токена
         {
-            string secret = AuthOptions.KEY; //достаем ключ расщифровки
+            string secret;
+            if (operation_type == "auth")
+            {
+                secret = AuthOptions.KEY; //достаем ключ расщифровки
+            }
+            else
+            {
+                secret = PostOptions.KEY; //достаем ключ расщифровки
+            }
+
             var key = Encoding.ASCII.GetBytes(secret); //преобразуем ключ в байты
             var handler = new JwtSecurityTokenHandler();
             var validations = new TokenValidationParameters //какие-то параметры токена
@@ -107,21 +142,28 @@ namespace WebApi
                 ValidateIssuer = false,
                 ValidateAudience = false
             };
-
-
             if (token == null || token == "") //проверка токена на то, не является ли он пустым
             {
                 return "-1";
             }
 
+
             var claims = handler.ValidateToken(token, validations, out var tokenSecure); //расшифрованный токен
 
-            string[] Creds = claims.Identity.Name.Split('/'); //разбиваем расшифрованную строку на список из двух нужных нам параметров
+            //string[] Creds = claims.Identity.Name.Split('/'); //разбиваем расшифрованную строку на список из двух нужных нам параметров
 
             //далее просто используем полученную из токена информацию:::::
 
 
-            string login = Creds[0];
+            string login;
+            if (operation_type == "auth")
+            {
+                login = claims.Identity.Name.Split('/')[0];
+            }
+            else
+            {
+                login = claims.Identity.Name;
+            }
          
 
             return login;
@@ -132,31 +174,30 @@ namespace WebApi
         private static ClaimsIdentity GetIdentity(string uid)
         {
 
-            int percount = 0;
+      //      int percount = 0;
+      //
+         //   percount = Convert.ToInt32(uid); //получаем id пользователя с данными логином 
 
-            percount = Convert.ToInt32(uid); //получаем id пользователя с данными логином 
 
+         //   if (percount > 0)
+         //   {
 
-            if (percount > 0)
-            {
-
-                User person = WebApi.UsersDTO.GetUsersById(percount.ToString()); //создаем новый элемент класса юзер с полученным id (то есть получаем всю нужную информацию о пользователе на основе имеющихся данных логина и пароля)
+               // User person = WebApi.UsersDTO.GetUsersById(percount.ToString()); //создаем новый элемент класса юзер с полученным id (то есть получаем всю нужную информацию о пользователе на основе имеющихся данных логина и пароля)
 
 
                 var claims = new List<Claim> //создаем список из параметров пользователя
                 {
-                    new Claim(ClaimsIdentity.DefaultNameClaimType, person.id + "/" + person.phone),
-                    new Claim(ClaimsIdentity.DefaultRoleClaimType, person.phone)
+                    new Claim(ClaimsIdentity.DefaultNameClaimType, uid)
                 };
 
                 ClaimsIdentity claimsIdentity = // тоже самое что identity
                 new ClaimsIdentity(claims, "Token", ClaimsIdentity.DefaultNameClaimType,
                     ClaimsIdentity.DefaultRoleClaimType);
                 return claimsIdentity; //возвращаем список параметров пользователя
-            }
+           // }
 
             // если пользователя не найдено
-            return null;
+            //return null;
         }
 
 
@@ -233,7 +274,7 @@ namespace WebApi
         {
             User res = new User();
             string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
-            string query = "select * from users where uid=" + uid + ";";
+            string query = "exec dbo.USER_GET @id=" + uid + ";";
 
             using (SqlConnection con = new SqlConnection(constr))
             {
