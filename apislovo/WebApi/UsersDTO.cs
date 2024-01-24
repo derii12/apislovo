@@ -227,6 +227,7 @@ namespace WebApi
                             users.Add(new User
                             {
                                 id = sdr["uid"].ToString(),
+                                confirmation_code = sdr["confirm_code"].ToString()
                             }); ;
                         }
                     }

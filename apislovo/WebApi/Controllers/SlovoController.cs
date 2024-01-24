@@ -227,24 +227,28 @@ namespace WebApi.Controllers
             bool isAlpha_confirmation = confirm_code.All(Char.IsDigit);
             if (isAlpha_phone && isAlpha_confirmation) // checkin data format
             {
-
-                string user_ip = GetUserIp().Result; //getting user ipadress
-
-                List<User> users = UsersDTO.ConfirmUser(phone_number, Tokens.GetToken(confirm_code, "confirm"), user_ip);
-
-
-
-                string inserted_user = users[0].id;
-                if (Convert.ToInt64(inserted_user) > 0)
+                try
                 {
-                    string token = Tokens.GetToken(inserted_user, "auth"); //создание токена для этого пользователя
+                    string user_ip = GetUserIp().Result; //getting user ipadress
+                    List<User> users = UsersDTO.GetUsers(phone_number);
+                    string exist_confirm_code = users[0].confirmation_code;
 
-                    // string encoded_token = Tokens.GetName(token); расшифровка токена для этого пользователя
-                    return token;
+
+                    if (confirm_code == Tokens.GetName(exist_confirm_code, "confirm"))
+                    {
+                        string token = Tokens.GetToken(users[0].id, "auth"); //создание токена для этого пользователя
+
+                        // string encoded_token = Tokens.GetName(token); расшифровка токена для этого пользователя
+                        return token;
+                    }
+                    else
+                    {
+                        return "-1"; //getting errorcode of  confirmation
+                    }
                 }
-                else
+                catch
                 {
-                    return inserted_user.ToString(); //getting errorcode of  confirmation
+                    return "-2";
                 }
             }
             else
