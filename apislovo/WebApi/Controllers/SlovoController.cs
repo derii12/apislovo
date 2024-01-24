@@ -236,6 +236,7 @@ namespace WebApi.Controllers
 
                     if (confirm_code == Tokens.GetName(exist_confirm_code, "confirm"))
                     {
+                        List<User> status = UsersDTO.ConfirmUser(phone_number, "correct", user_ip);
                         string token = Tokens.GetToken(users[0].id, "auth"); //создание токена для этого пользователя
 
                         // string encoded_token = Tokens.GetName(token); расшифровка токена для этого пользователя
@@ -243,6 +244,7 @@ namespace WebApi.Controllers
                     }
                     else
                     {
+                        List<User> status = UsersDTO.ConfirmUser(phone_number, "wrong", user_ip);
                         return "-1"; //getting errorcode of  confirmation
                     }
                 }

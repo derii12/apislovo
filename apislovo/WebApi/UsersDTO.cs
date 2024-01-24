@@ -331,12 +331,12 @@ namespace WebApi
             return res;
         }
 
-        public static List<User> ConfirmUser(string phone_number, string confirm_code, string user_ip)
+        public static List<User> ConfirmUser(string phone_number, string confirm_status, string user_ip)
         {
             List<User> users = new List<User>();
 
             string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
-            string query = "exec dbo.USER_CONFIRM @phonenumb = '" + phone_number + "', @confirm_code = '" + confirm_code + "', @user_ip = '" + user_ip + "';";
+            string query = "exec dbo.USER_CONFIRM @phonenumb = '" + phone_number + "', @confirm_status = '" + confirm_status + "', @user_ip = '" + user_ip + "';";
 
             using (SqlConnection con = new SqlConnection(constr))
             {
