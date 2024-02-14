@@ -8,6 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography;
 
 namespace WebApi
 {
@@ -29,7 +30,14 @@ namespace WebApi
         public string streak { get; set; }
 
         public string friend_status { get; set; }
+
+        public string unique_user_code { get; set; }    
+
+        public string user_public_key { get; set; }
     }
+
+
+
 
     public class Post
     {
@@ -41,7 +49,7 @@ namespace WebApi
 
         public string post_time { get; set; }
 
-
+        public string post_unique_key { get; set; }
 
     }
 
@@ -51,6 +59,18 @@ namespace WebApi
         public const string ISSUER = "SlovoServer"; // издатель токена
         public const string AUDIENCE = "SlovoClient"; // потребитель токена
         public const string KEY = "svdiufbiweubfiuweiufgbwieugiowueoioinowiheiufguqwyfywqtcyewtcdfiwjbiowubeiofnwioeuguygviwjbfoeineiouibioubweoifncncnejegheywyweuejhfbejfiweuiow3uejejdyuedbdfiweuebfw";   // ключ для шифрации
+        public const Int64 LIFETIME = 30; // время жизни токена
+        public static SymmetricSecurityKey GetSymmetricSecurityKey()
+        {
+            return new SymmetricSecurityKey(Encoding.ASCII.GetBytes(KEY));
+        }
+    }
+
+    public class RefreshAuthOptions
+    {
+        public const string ISSUER = "SlovoRefreshServer"; // издатель токена
+        public const string AUDIENCE = "SlovoRefreshClient"; // потребитель токена
+        public const string KEY = "swjbfoeineiouibioubweoifncncnejegw3uejejdyvdiufbiweubfiuwheywyweuejhfbejfiwdyvdiufbiweubfiuweiufgbwieugifklejkru8i9oej4w589cjeuw8rh783u4578tcvye4895ut9ws8er0tyoetd0yupftphjbfltoolivdkeriiufguqwyfywqtcyewtcdfiwjbiowubeiofnwioeuguygviuedbdfiweuebfw";   // ключ для шифрации
         public const Int64 LIFETIME = 1000000; // время жизни токена
         public static SymmetricSecurityKey GetSymmetricSecurityKey()
         {
@@ -62,8 +82,8 @@ namespace WebApi
     {
         public const string ISSUER = "SlovoPostServer"; // издатель токена
         public const string AUDIENCE = "SlovoPostClient"; // потребитель токена
-        public const string KEY = "svdiufbiweuiejruiejtuudhfudfijdgijgfkdkvkvneiouibioubweoifncncnejegheywyweuejhfbejfiweuiow3uejejdyuedbdfiweuebffghfyhrthrghert4rrtertdrtreryrert545ytw";   // ключ для шифрации
-        public const Int64 LIFETIME = 1000000; // время жизни токена
+        public const string KEY = "svdiufbsadjfiejuwehjruh489u2893u489u2ie3jxdi2j498yu7843ty8347yuf58y23id4u9283udij3irsiorjtoseirt90ewiort034o90rit03945j983j458dj3894yertgdrfgegerg53445wewsethdjgfggdferrt3ty4yutyurtdyhjfjkgujdgfdfyutgyyjyujfvfghfghdfxdger2455y5iopirt545ytw";   // ключ для шифрации
+        public const Int64 LIFETIME = 100000; // время жизни токена
         public static SymmetricSecurityKey GetSymmetricSecurityKey()
         {
             return new SymmetricSecurityKey(Encoding.ASCII.GetBytes(KEY));
@@ -98,7 +118,19 @@ namespace WebApi
                         expires: now.Add(TimeSpan.FromMinutes(AuthOptions.LIFETIME)),
                         signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
             }
-            else
+
+            if (operation_type == "refresh_auth")
+            {
+                jwt = new JwtSecurityToken(
+                        issuer: RefreshAuthOptions.ISSUER,
+                        audience: RefreshAuthOptions.AUDIENCE,
+                        notBefore: now,
+                        claims: identity.Claims, //получаем список claims из identity
+                        expires: now.Add(TimeSpan.FromMinutes(RefreshAuthOptions.LIFETIME)),
+                        signingCredentials: new SigningCredentials(RefreshAuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
+            }
+
+            if (operation_type!="auth" && operation_type != "refresh_auth")
             {
                 jwt = new JwtSecurityToken(
                         issuer: PostOptions.ISSUER,
@@ -123,12 +155,16 @@ namespace WebApi
 
         public static string GetName(string token, string operation_type) //получаем информацию из зашифрованного токена
         {
-            string secret;
+            string secret = "";
             if (operation_type == "auth")
             {
                 secret = AuthOptions.KEY; //достаем ключ расщифровки
             }
-            else
+            if (operation_type == "refresh_auth")
+            {
+                secret = RefreshAuthOptions.KEY;
+            }
+            if(operation_type != "auth" && operation_type != "refresh_auth")
             {
                 secret = PostOptions.KEY; //достаем ключ расщифровки
             }
@@ -206,6 +242,36 @@ namespace WebApi
     public static class UsersDTO
     {
 
+        public static User UpdateAutentificator(string previous_refresh_code, string new_refresh_code)
+        {
+            User res = new User();
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.USER_UPDATE_AUTENTIFICATOR @previous_refresh_code='" + previous_refresh_code + "', @new_refresh_code='"+ new_refresh_code + "', @new_refr_datetime='"+ DateTime.Now.ToString()+"';";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            res.id = sdr["uid"].ToString();
+
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return res;
+        }
+
+
         public static List<User> GetUsers(string phone_number)
         {
             List<User> users = new List<User>();
@@ -226,8 +292,7 @@ namespace WebApi
                         {
                             users.Add(new User
                             {
-                                id = sdr["uid"].ToString(),
-                                confirmation_code = sdr["confirm_code"].ToString()
+                                id = sdr["uid"].ToString()
                             }); ;
                         }
                     }
@@ -331,12 +396,12 @@ namespace WebApi
             return res;
         }
 
-        public static List<User> ConfirmUser(string phone_number, string confirm_status, string user_ip)
+        public static List<User> ConfirmUser(string phone_number, string confirm_status, string user_ip, string user_device, string new_refresh_code, string public_modulus)
         {
             List<User> users = new List<User>();
-
+            string datelog= DateTime.Now.ToString();
             string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
-            string query = "exec dbo.USER_CONFIRM @phonenumb = '" + phone_number + "', @confirm_status = '" + confirm_status + "', @user_ip = '" + user_ip + "';";
+            string query = "exec dbo.USER_CONFIRM @phonenumb = '" + phone_number + "', @confirm_status = '" + confirm_status + "', @user_ip = '" + user_ip + "', @user_device = '"+ user_device + "', @datelog = '"+ datelog + "', @new_refresh_code='"+ new_refresh_code + "', @public_key='"+ public_modulus + "';";
 
             using (SqlConnection con = new SqlConnection(constr))
             {
@@ -480,6 +545,38 @@ namespace WebApi
                             users.Add(new User
                             {
                                 id = sdr["idsnd"].ToString()
+                            }); ;
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return users;
+        }
+
+        public static List<User> LoadFriendPublicKey(string uid)
+        {
+            List<User> users = new List<User>();
+
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.LOAD_USER_PUBLICKEY @uid = " + uid + ";";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            users.Add(new User
+                            {
+                                user_public_key = sdr["public_key"].ToString()
                             }); ;
                         }
                     }
@@ -747,12 +844,12 @@ namespace WebApi
 
 
 
-        public static List<User> InsertUser(string phone_number, string username, string confirm_code, string newinviter, string confirm_code_creating)
+        public static List<User> InsertUser(string phone_number, string username, string confirm_code, string newinviter, string confirm_code_creating, string unique_user_code)
         {
             List<User> users = new List<User>();
 
             string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
-            string query = "exec dbo.USER_INSERT @phone = '" + phone_number + "', @username = '"+ username + "', @invitecode = '" + confirm_code + "', @newinviter = '" + newinviter + "', @confirm_code_creating = '" + confirm_code_creating + "';";
+            string query = "exec dbo.USER_INSERT @phone = '" + phone_number + "', @username = '"+ username + "', @invitecode = '" + confirm_code + "', @newinviter = '" + newinviter + "', @confirm_code_creating = '" + confirm_code_creating + "', @user_code = '"+ unique_user_code + "';";
 
             using (SqlConnection con = new SqlConnection(constr))
             {

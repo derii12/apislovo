@@ -60,7 +60,7 @@ namespace WebApi.Controllers
 
         // GET: SlovoController/Details/5
         [HttpGet("Phone_number_checking")]  // checking for user by phone number, and sanding confirm call if user is alredy in database
-        async public Task<string> Phone_number_checking(string phone_number)
+        async public Task<string> Phone_number_checking(string phone_number, string ip, string device)
         {
             bool isAlpha = phone_number.All(Char.IsDigit);
             if (isAlpha)
@@ -72,22 +72,9 @@ namespace WebApi.Controllers
                 {
                     try
                     {
-                        string ip = " "; // getting ip adres of unique user
+                        string thisip = ip.Replace("'", "").Replace("-", "").Split(',')[0];
 
-                        var headers = Request.Headers.ToList();
-                        foreach (var h in headers)
-                        {
-                            string hname = h.Key;
-                            string hvalue = h.Value.ToString();
-
-                            if (hname == "X-Forwarded-For")
-                            {
-                                ip = hvalue.Split(',')[0];
-                            }
-
-                        }
-
-                        var confirmed_user = await GetConfirmAndSend(phone_number, ip); //sending phone number and ip adress, creating confirm call
+                        var confirmed_user = await GetConfirmAndSend(phone_number, thisip); //sending phone number and ip adress, creating confirm call
 
                         dynamic request_sms_array = JsonConvert.DeserializeObject(confirmed_user);
                         string confirm_code_creating = request_sms_array["code"].ToString(); //getting confirm code
@@ -122,7 +109,7 @@ namespace WebApi.Controllers
 
             HttpClient client = new HttpClient();
 
-            string Url = "https://sms.ru/code/call?phone=" + phone + "&api_id=96D8F30A-2F80-CBCB-9096-8F38959EA997"; //sending url for call and send service
+            string Url = "https://sms.ru/code/call?phone=" + phone + "&ip=" + ip + "&api_id=96D8F30A-2F80-CBCB-9096-8F38959EA997"; //sending url for call and send service
 
             Uri uri = new Uri(string.Format(Url));
 
@@ -152,27 +139,8 @@ namespace WebApi.Controllers
         }
 
 
-        [HttpGet("GetUserIp")]
-        async public Task<string> GetUserIp() //getting user ipadress 
-        {
-            string ip = "none";
-            var headers = Request.Headers.ToList();
-            foreach (var h in headers)
-            {
-                string hname = h.Key;
-                string hvalue = h.Value.ToString();
-
-                if (hname == "X-Forwarded-For")
-                {
-                    return hvalue.Split(',')[0];
-                }
-
-            }
-            return ip;
-        }
-
         [HttpGet("Registration")]
-        async public Task<string> Registration(string phone_number, string username, string invitecode) // new user insertion
+        async public Task<string> Registration(string phone_number, string username, string invitecode, string ip, string device) // new user insertion
         {
             bool isAlpha_phone = phone_number.All(Char.IsDigit); /*проверка данных на соотвествие*/
             bool isAlpha_username = Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$"); //checking username for format
@@ -181,19 +149,18 @@ namespace WebApi.Controllers
             if (isAlpha_invitecode && isAlpha_phone && isAlpha_username && isAlpha_username_digit == false) //checking data for wrong format
             {
                 string newinviter = RandomString(10); //generating new invite_code
-
+                string unique_user_code = RandomString(25);
                 string confirm_code_creating = "register";
-                List<User> users = UsersDTO.InsertUser(phone_number, username.ToLower(), invitecode, newinviter, confirm_code_creating); //пытаемся записать нового пользователя и получить его id
+                List<User> users = UsersDTO.InsertUser(phone_number, username.ToLower(), invitecode, newinviter, confirm_code_creating, unique_user_code); //пытаемся записать нового пользователя и получить его id
 
                 string inserted_user = users[0].id;
                 if (Convert.ToInt64(inserted_user) > 0) //если пользователь внесен в бд, и код приглашения существует, то отправляем смс для подтверждения номера
                 {
+                    string thisip = ip.Replace("'", "").Replace("-", "").Split(',')[0];
                     try
                     {
-                        string ip = GetUserIp().Result; //ip of registered user if registation was successful
-
-
-                        var confirmed_user = await GetConfirmAndSend(phone_number, ip);
+                        //ip of registered user if registation was successful
+                        var confirmed_user = await GetConfirmAndSend(phone_number, thisip);
                         dynamic request_sms_array = JsonConvert.DeserializeObject(confirmed_user); //getting json answer 
                         string new_confirm_code_creating = request_sms_array["code"].ToString();//selecting confirmation string code
 
@@ -203,8 +170,8 @@ namespace WebApi.Controllers
                     }
                     catch
                     {
-                        string ip = "";
-                        var confirmed_user = await GetConfirmAndSend(phone_number, ip);
+                        ip = "";
+                        var confirmed_user = await GetConfirmAndSend(phone_number, thisip);
                         return "error"; //error of sending confirmation code for user
                     }
                 }
@@ -220,31 +187,42 @@ namespace WebApi.Controllers
                 return "bad_username"; //wrong format of username(if user was not tried to hack our mobile app)
             }
         }
+
+        
+
         [HttpGet("Confirmation")]
-        public string Confirmation(string phone_number, string confirm_code) //checking entered confirm code for actuality
+        public string Confirmation(string phone_number, string confirm_code, string public_modulus, string ip, string device) //checking entered confirm code for actuality
         {
             bool isAlpha_phone = phone_number.All(Char.IsDigit); /*проверка данных на соотвествие*/
+            string thisdevise = "";
+            string thisip = "";
             bool isAlpha_confirmation = confirm_code.All(Char.IsDigit);
-            if (isAlpha_phone && isAlpha_confirmation) // checkin data format
+            if (isAlpha_phone && isAlpha_confirmation && Regex.IsMatch(public_modulus, @"^[a-zA-Z0-9/=*]+$")) // checkin data format
             {
                 try
                 {
-                    string user_ip = GetUserIp().Result; //getting user ipadress
                     List<User> users = UsersDTO.GetUsers(phone_number);
-                    string exist_confirm_code = users[0].confirmation_code;
+                    User usersinf = UsersDTO.GetUsersById(users[0].id);
+                    string exist_confirm_code = usersinf.confirmation_code;
+
+                    
+                        thisdevise = device.Replace("'","").Replace("-", "").Split('(')[1].Split(')')[0];
 
 
+                        thisip = ip.Replace("'", "").Replace("-", "").Split(',')[0];
                     if (confirm_code == Tokens.GetName(exist_confirm_code, "confirm"))
                     {
-                        List<User> status = UsersDTO.ConfirmUser(phone_number, "correct", user_ip);
+                        string new_refresh_code = RandomString(40);
+                        List<User> status = UsersDTO.ConfirmUser(phone_number, "correct", thisip, thisdevise, new_refresh_code, public_modulus);
                         string token = Tokens.GetToken(users[0].id, "auth"); //создание токена для этого пользователя
+                        string refresh_token = Tokens.GetToken(new_refresh_code, "refresh_auth");
 
                         // string encoded_token = Tokens.GetName(token); расшифровка токена для этого пользователя
-                        return token;
+                        return token + ";" + refresh_token;
                     }
                     else
                     {
-                        List<User> status = UsersDTO.ConfirmUser(phone_number, "wrong", user_ip);
+                        List<User> status = UsersDTO.ConfirmUser(phone_number, "wrong", thisip, thisdevise, "none", public_modulus);
                         return "-1"; //getting errorcode of  confirmation
                     }
                 }
@@ -260,14 +238,15 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("username_get")] // getting info about this user(username,invitecode,streaks)
-        public string username_get(string token)
+        public string username_get(string token, string ip, string device)
         {
             try
             {
                 string encoded_token = Tokens.GetName(token,"auth"); //get encoded token (user id)
                 User person = UsersDTO.GetUsersById(encoded_token); //geting info about user
                 User pesoncode = UsersDTO.LoadUserInvite(encoded_token); //getting invite code for this user
-                return person.username + ";" + pesoncode.invite_code;
+                User userstreak = UsersDTO.GetUsersStreak(encoded_token); //getting streak of current user
+                return person.username + ";" + pesoncode.invite_code + ";" + userstreak.streak;
                 // int got_username = Convert.ToInt32(person.username);
             }
             catch
@@ -278,8 +257,34 @@ namespace WebApi.Controllers
         }
 
 
+        [HttpGet("user_autentification")] // getting info about this user(username,invitecode,streaks)
+        public string user_autentification(string refresh_token, string ip, string device)
+        {
+            try
+            {
+                string refresh_str = Tokens.GetName(refresh_token, "refresh_auth");
+                string new_refres_str = RandomString(40);
+                string update_res = UsersDTO.UpdateAutentificator(refresh_str, new_refres_str).id;
+                if (update_res != "-1")
+                {
+                    string new_token = Tokens.GetToken(update_res, "auth");
+                    string new_refresh_token = Tokens.GetToken(new_refres_str, "refresh_auth");
+                    return new_token + ";"+ new_refresh_token;
+                }
+                else
+                {
+                    return "error"; // refresh token not found(probably account was hacked)
+                }
+            }
+            catch
+            {
+
+                return "-1"; //wrong token error code
+            }
+        }
+
         [HttpGet("new_post")]
-        public string new_post(string token, string post_text) //creating new post for this user
+        public string new_post(string token, string post_text, string ip, string device) //creating new post for this user
         {
             try
             {
@@ -316,7 +321,7 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("refresh")]
-        public string refresh() //procedure of checking database for posts, which time is left
+        public string refresh(string ip, string device) //procedure of checking database for posts, which time is left
         {
             UsersDTO.Refresh();
             return "success"; 
@@ -331,9 +336,9 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("load_post")]
-        public string load_post(string token) //load autor's post
+        public string load_post(string token, string ip, string device) //load autor's post
         {
-                string a = refresh();
+                string a = refresh(ip, device);
             try
             {
                 string encoded_token = Tokens.GetName(token,"auth"); // get encoded token(user id)
@@ -358,7 +363,7 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("load_friends_posts")]
-        public string load_friends_posts(string token) //getting friends posts for this user
+        public string load_friends_posts(string token, string ip, string device) //getting friends posts for this user
         {
             try
             {
@@ -386,7 +391,7 @@ namespace WebApi.Controllers
                 }
                 else //user's friends have some posts
                 {
-                    refresh(); 
+                    refresh(ip, device); 
                     find_post_res_info = find_post_res_info.Remove(0, 1);
                     find_post_res_time = find_post_res_time.Remove(0, 1);
                     return find_post_res_info + "•" + find_post_res_time; //creating answer which consist all information about user's friends posts
@@ -400,7 +405,7 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("add_friend")] // adding new friend for user 
-        public string add_friend(string token, string username)
+        public string add_friend(string token, string username, string ip, string device)
         {
             try
             {
@@ -427,7 +432,7 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("edit_username")]
-        public string edit_username(string token, string new_username) //editing username of this user
+        public string edit_username(string token, string new_username, string ip, string device) //editing username of this user
         {
             bool isAlpha_username = Regex.IsMatch(new_username, @"^[a-zA-Z0-9_]+$"); //checking new username format
             bool isAlpha_newusername= new_username.All(Char.IsDigit); // checking if new username consist only digits
@@ -453,7 +458,7 @@ namespace WebApi.Controllers
 
 
         [HttpGet("delete_friend")]
-        public string delete_friend(string token, string username) //delete friend of this user
+        public string delete_friend(string token, string username, string ip, string device) //delete friend of this user
         {
             try
             {
@@ -480,7 +485,7 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("accept_friend")]
-        public string accept_friend(string token, string username) // accepting friendship request for this user 
+        public string accept_friend(string token, string username, string ip, string device) // accepting friendship request for this user 
         {
             try
             {
@@ -508,7 +513,7 @@ namespace WebApi.Controllers
 
 
         [HttpGet("search_user")]
-        public string search_user(string token, string search_stroke)//searching users by str, which username consist this str
+        public string search_user(string token, string search_stroke, string ip, string device)//searching users by str, which username consist this str
         {
             bool isAlpha_search_stroke = Regex.IsMatch(search_stroke, @"^[a-zA-Z0-9_]+$");
             if (isAlpha_search_stroke)
@@ -548,7 +553,7 @@ namespace WebApi.Controllers
 
 
         [HttpGet("load_friends")]
-        public string load_friends(string token) //getting all friends usernames of this user
+        public string load_friends(string token, string ip, string device) //getting all friends usernames of this user
         {
             try
             {
@@ -575,8 +580,36 @@ namespace WebApi.Controllers
             }
         }
 
+        [HttpGet("load_friends_public_keys")]
+        public string load_friends_public_keys(string token, string ip, string device) //getting all friends usernames of this user
+        {
+            try
+            {
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+                List<User> find_friends = UsersDTO.LoadFriends(encoded_token);//getting all user's friends id
+
+                if (find_friends[0].id != "-1") //if user have some friends
+                {
+                    string find_res = UsersDTO.GetUsersById(find_friends[0].id).username + "•" + UsersDTO.LoadFriendPublicKey(find_friends[0].id)[0].user_public_key;
+                    for (int i = 1; i < find_friends.Count; i++)
+                    {
+                        find_res = find_res + ";" + UsersDTO.GetUsersById(find_friends[i].id).username + "•" + UsersDTO.LoadFriendPublicKey(find_friends[i].id)[0].user_public_key; //generating usernames list
+                    }
+                    return "{" + find_res + "}"; //creating answer string
+                }
+                else
+                {
+                    return "notfound"; //if user have no friends
+                }
+            }
+            catch
+            {
+                return "error"; // wrong token
+            }
+        }
+
         [HttpGet("load_requests")]
-        public string load_requests(string token) //getting all user incoming friendship requests
+        public string load_requests(string token, string ip, string device) //getting all user incoming friendship requests
         {
             try
             {
