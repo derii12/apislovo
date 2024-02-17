@@ -292,24 +292,10 @@ namespace WebApi.Controllers
 
 
                      string post_txt_token = "";
-                int amount = 0;
+                    post_txt_token = Tokens.GetToken(post_text, "post");
 
-                if (post_text != "" && post_text != null)
-                {
-                    amount = post_text.Split('\n').Length - 1;
-                    char[] charsToTrim = { '\n', '\'' };
-                    string post_text_actual = post_text.Trim(charsToTrim);
-                    post_txt_token = Tokens.GetToken(post_text_actual, "post");
-                }
-                if (amount < 7)
-                {
                     Post new_post = UsersDTO.NewUserPost(encoded_token, post_txt_token); //creating new post for this user (new post text)
                     return "success"; // post created succesfull
-                }
-                else
-                {
-                    return "too much line breaks!";
-                }
 
                  
                 // int got_username = Convert.ToInt32(person.username);
@@ -370,14 +356,14 @@ namespace WebApi.Controllers
                 string encoded_token = Tokens.GetName(token, "auth"); //get encoded token(id)
                 List<User> find_friends = UsersDTO.LoadFriends(encoded_token); //getting all friends of this user
                 Post friendpost = UsersDTO.LoadUserPost(find_friends[0].id);//trying to get post of first friend in the list
-                string find_post_res_info = ""; //information of post string(post text, author, streak)
+                string find_post_res_info = ""; //information of post string(post text, key, author, streak)
                 string find_post_res_time = ""; // information of post time (how much seconds post will be alive)
                 for (int i = 0; i < find_friends.Count; i++)//checking for another friends post 
                 {
                     Post friendpostother = UsersDTO.LoadUserPost(find_friends[i].id); //getting i's friend post by friend id
                     if (friendpostother.id != null) 
                     {
-                        find_post_res_info = find_post_res_info + "~" + Tokens.GetName(friendpostother.post_text, "post") + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak; //getting information about post and adding it to string
+                        find_post_res_info = find_post_res_info + "~" + Tokens.GetName(friendpostother.post_text, "post") + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak + "|" + UsersDTO.GetPrivatePost(friendpostother.id, encoded_token).post_unique_key; //getting information about post and adding it to string
                         find_post_res_time = find_post_res_time + "|" + PostLeftSecods(friendpostother.post_time); //getting seconds, how much post will be alive
                     }
                     else
@@ -391,7 +377,7 @@ namespace WebApi.Controllers
                 }
                 else //user's friends have some posts
                 {
-                    refresh(ip, device); 
+                    //refresh(ip, device); 
                     find_post_res_info = find_post_res_info.Remove(0, 1);
                     find_post_res_time = find_post_res_time.Remove(0, 1);
                     return find_post_res_info + "•" + find_post_res_time; //creating answer which consist all information about user's friends posts
@@ -590,16 +576,45 @@ namespace WebApi.Controllers
 
                 if (find_friends[0].id != "-1") //if user have some friends
                 {
-                    string find_res = UsersDTO.GetUsersById(find_friends[0].id).username + "•" + UsersDTO.LoadFriendPublicKey(find_friends[0].id)[0].user_public_key;
+                    string find_res = UsersDTO.GetUsersById(find_friends[0].id).unique_user_code + "•" + UsersDTO.LoadFriendPublicKey(find_friends[0].id)[0].user_public_key;
                     for (int i = 1; i < find_friends.Count; i++)
                     {
-                        find_res = find_res + ";" + UsersDTO.GetUsersById(find_friends[i].id).username + "•" + UsersDTO.LoadFriendPublicKey(find_friends[i].id)[0].user_public_key; //generating usernames list
+                        find_res = find_res + ";" + UsersDTO.GetUsersById(find_friends[i].id).unique_user_code + "•" + UsersDTO.LoadFriendPublicKey(find_friends[i].id)[0].user_public_key; //generating usernames list
                     }
                     return "{" + find_res + "}"; //creating answer string
                 }
                 else
                 {
                     return "notfound"; //if user have no friends
+                }
+            }
+            catch
+            {
+                return "error"; // wrong token
+            }
+        }
+
+        [HttpGet("new_private_posts")]
+        public string load_friends_public_keys(string token, string keys, string ip, string device) //getting all friends usernames of this user
+        {
+            try
+            {
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+                if (Regex.IsMatch(keys, @"^[a-zA-Z0-9/=•;*]+$"))
+                {
+                    string postid = UsersDTO.LoadUserPost(encoded_token).id;
+                    string[] sent_keys = keys.Split('•');
+                    for (int i = 0; i < sent_keys.Length; i++)
+                    {
+                        var this_reader = sent_keys[i].Split(';');
+                        string readerid = UsersDTO.GetUsersByUniqueUserCode(this_reader[0]).id;
+                        string this_user_res = UsersDTO.AddPrivatePost(postid, readerid, this_reader[1], "1").private_post_id;
+                    }
+                    return "success";
+                }
+                else
+                {
+                    return "-1";
                 }
             }
             catch

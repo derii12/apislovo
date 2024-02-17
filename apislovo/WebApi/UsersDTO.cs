@@ -49,8 +49,16 @@ namespace WebApi
 
         public string post_time { get; set; }
 
+
+    }
+
+    public class PrivatePost
+    {
+        public string private_post_id { get; set; }
+
         public string post_unique_key { get; set; }
 
+        public string visibility { get; set; }
     }
 
 
@@ -357,6 +365,39 @@ namespace WebApi
                             res.username = sdr["username"].ToString();
                             res.phone = sdr["phone"].ToString();
                             res.confirmation_code = sdr["confirm_code"].ToString();
+                            res.unique_user_code = sdr["personal_code"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return res;
+        }
+
+        public static User GetUsersByUniqueUserCode(string usercode)
+        {
+            User res = new User();
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.USER_GET_BY_UNIQUE_CODE @usercode='" + usercode + "';";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            res.id = sdr["uid"].ToString();
+                            res.username = sdr["username"].ToString();
+                            res.phone = sdr["phone"].ToString();
+                            res.confirmation_code = sdr["confirm_code"].ToString();
+                            res.unique_user_code = sdr["personal_code"].ToString();
                         }
                     }
                     con.Close();
@@ -620,6 +661,66 @@ namespace WebApi
             return users;
         }
 
+
+        public static PrivatePost GetPrivatePost(string post_id, string reader_id)
+        {
+            PrivatePost posts = new PrivatePost();
+
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.GET_PRIVATE_POST @post_id = " + post_id + ", @reader_id = " + reader_id + ";";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            posts.private_post_id = sdr["private_post_id"].ToString();
+                            posts.post_unique_key = sdr["encoder_key"].ToString();
+                            posts.visibility = sdr["status"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return posts;
+        }
+
+        public static PrivatePost AddPrivatePost(string post_id, string reader_id, string encoder_key, string status)
+        {
+            PrivatePost posts = new PrivatePost();
+
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.ADD_PRIVATE_POST @post_id = " + post_id + ", @reader_id = " + reader_id + ", @encoder_key = '" + encoder_key + "', @status = " + status + ";";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            posts.private_post_id = sdr["private_post_id"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return posts;
+        }
 
         public static List<User> EditUsername(string uid, string new_username)
         {
