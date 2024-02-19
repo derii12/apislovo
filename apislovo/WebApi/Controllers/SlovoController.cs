@@ -313,11 +313,11 @@ namespace WebApi.Controllers
             return "success"; 
         }
 
-        public static string PostLeftSecods(string post_time) //getting time in seconds, how much post will be actual
+        public static int PostLeftSecods(string post_time) //getting time in seconds, how much post will be actual
         {
             DateTimeOffset dtnow = new DateTimeOffset(DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc), TimeSpan.Zero); //getting now server time
             DateTimeOffset dtpost = new DateTimeOffset(DateTime.SpecifyKind(Convert.ToDateTime(post_time), DateTimeKind.Utc), TimeSpan.Zero); //getting time, when post has been created
-            string post_time_left_seconds = (86400 - dtnow.ToUnixTimeSeconds() + dtpost.ToUnixTimeSeconds()).ToString(); //counting how much seconds post will be alive
+            int post_time_left_seconds = Convert.ToInt32(86400 - dtnow.ToUnixTimeSeconds() + dtpost.ToUnixTimeSeconds()); //counting how much seconds post will be alive
             return post_time_left_seconds;
         }
 
@@ -328,19 +328,28 @@ namespace WebApi.Controllers
             try
             {
                 string encoded_token = Tokens.GetName(token,"auth"); // get encoded token(user id)
+               
                 Post post = UsersDTO.LoadUserPost(encoded_token); // load post info by uesr id
-                string uncoded_txt;
-                if (post.post_text == null)
+                int left_seconds = PostLeftSecods(post.post_time);
+                if (left_seconds > 0)
                 {
-                    uncoded_txt = "";
+                    string uncoded_txt;
+                    if (post.post_text == null)
+                    {
+                        uncoded_txt = "";
+                    }
+                    else
+                    {
+                        uncoded_txt = Tokens.GetName(post.post_text, "post");
+                    }
+
+                    return "{" + uncoded_txt + ";" + left_seconds + "}"; //sending request about user post information
+                                                           // int got_username = Convert.ToInt32(person.username);
                 }
                 else
                 {
-                    uncoded_txt = Tokens.GetName(post.post_text, "post");
+                    return "-1";
                 }
-
-                return "{" + uncoded_txt + ";" + PostLeftSecods(post.post_time) + "}"; //sending request about user post information
-                                                                                          // int got_username = Convert.ToInt32(person.username);
             }
             catch
             {
@@ -361,10 +370,11 @@ namespace WebApi.Controllers
                 for (int i = 0; i < find_friends.Count; i++)//checking for another friends post 
                 {
                     Post friendpostother = UsersDTO.LoadUserPost(find_friends[i].id); //getting i's friend post by friend id
-                    if (friendpostother.id != null) 
+                    int curr_postime = PostLeftSecods(friendpostother.post_time);
+                    if (friendpostother.id != null && curr_postime > 0) 
                     {
                         find_post_res_info = find_post_res_info + "~" + Tokens.GetName(friendpostother.post_text, "post") + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak + "|" + UsersDTO.GetPrivatePost(friendpostother.id, encoded_token).post_unique_key; //getting information about post and adding it to string
-                        find_post_res_time = find_post_res_time + "|" + PostLeftSecods(friendpostother.post_time); //getting seconds, how much post will be alive
+                        find_post_res_time = find_post_res_time + "|" + curr_postime; //getting seconds, how much post will be alive
                     }
                     else
                     {
