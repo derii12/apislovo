@@ -526,10 +526,10 @@ namespace WebApi.Controllers
                         List<User> find_users = UsersDTO.SearchPeople(encoded_token, search_stroke); //getting users, that consist entered str
                         if (find_users[0].id != "-7") //if there is some users that consists str in username
                         {
-                            string find_res = find_users[0].username + "|" + UsersDTO.FriendStatus(find_users[0].id, encoded_token).friend_status; //first username,of found users
+                            string find_res = find_users[0].username + "|" + UsersDTO.FriendStatus(find_users[0].id, encoded_token).friend_status + "|" + find_users[0].unique_user_code; //first username,of found users
                             for (int i = 1; i < find_users.Count; i++)
                             {
-                                find_res = find_res + ";" + find_users[i].username + "|" + UsersDTO.FriendStatus(find_users[i].id, encoded_token).friend_status; //adding other found users
+                                find_res = find_res + ";" + find_users[i].username + "|" + UsersDTO.FriendStatus(find_users[i].id, encoded_token).friend_status + "|" + find_users[i].unique_user_code; //adding other found users
                             }
                             return "{" + find_res + "}";//stroke of found usernasmes
                         }
@@ -596,6 +596,38 @@ namespace WebApi.Controllers
                 else
                 {
                     return "notfound"; //if user have no friends
+                }
+            }
+            catch
+            {
+                return "error"; // wrong token
+            }
+        }
+
+
+        [HttpGet("load_user_public_key")]
+        public string load_user_public_key(string token, string personal_code, string ip, string device) //getting all friends usernames of this user
+        {
+            try
+            {
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+                if (Regex.IsMatch(personal_code, @"^[a-zA-Z0-9_]+$"))
+                {
+                    User find_friend = UsersDTO.GetUsersByUniqueUserCode(personal_code);//getting all user's friends id
+
+                    if (find_friend.id != "-1") //if user have some friends
+                    {
+                        string find_res = UsersDTO.LoadFriendPublicKey(find_friend.id)[0].user_public_key;
+                        return find_res;
+                    }
+                    else
+                    {
+                        return "notfound"; //if user have no friends
+                    }
+                }
+                else
+                {
+                    return "error";
                 }
             }
             catch

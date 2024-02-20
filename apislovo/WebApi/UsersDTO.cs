@@ -520,7 +520,8 @@ namespace WebApi
                             users.Add(new User
                             {
                                 id = sdr["uid"].ToString(),
-                                username = sdr["username"].ToString()
+                                username = sdr["username"].ToString(),
+                                unique_user_code = sdr["personal_code"].ToString()
                             }); ;
                         }
                     }
