@@ -44,6 +44,7 @@ using System.Net.Sockets;
 using Microsoft.AspNetCore.Http.Extensions;
 using GraphQLParser;
 using System.Reactive.Joins;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace WebApi.Controllers
 {
@@ -290,14 +291,19 @@ namespace WebApi.Controllers
             {
                     string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
 
+                if (Regex.IsMatch(post_text, @"^[a-zA-Z0-9/=•;*]+$"))
+                {
 
-                     string post_txt_token = "";
-                    post_txt_token = Tokens.GetToken(post_text, "post");
 
-                    Post new_post = UsersDTO.NewUserPost(encoded_token, post_txt_token); //creating new post for this user (new post text)
+
+                    Post new_post = UsersDTO.NewUserPost(encoded_token, post_text); //creating new post for this user (new post text)
                     return "success"; // post created succesfull
 
-                 
+                }
+                else
+                {
+                    return "-1";
+                }
                 // int got_username = Convert.ToInt32(person.username);
             }
             catch
@@ -307,10 +313,14 @@ namespace WebApi.Controllers
         }
 
         [HttpGet("refresh")]
-        public string refresh(string ip, string device) //procedure of checking database for posts, which time is left
+        public string refresh(string linker,string ip, string device) //procedure of checking database for posts, which time is left
         {
-            UsersDTO.Refresh();
-            return "success"; 
+            if (linker == "ejwuioedj2893rhf7uwehr9f8j23986uiejidc89w5uc89yw4785yw78892wujxikq3949c0-239902u04s3ur89w3hujuhtfreswa2s15g48ihejhwsej")
+            {
+                UsersDTO.Refresh();
+                return "success";
+            }
+            return "success1"; 
         }
 
         public static int PostLeftSecods(string post_time) //getting time in seconds, how much post will be actual
@@ -324,7 +334,7 @@ namespace WebApi.Controllers
         [HttpGet("load_post")]
         public string load_post(string token, string ip, string device) //load autor's post
         {
-                string a = refresh(ip, device);
+                
             try
             {
                 string encoded_token = Tokens.GetName(token,"auth"); // get encoded token(user id)
@@ -333,17 +343,7 @@ namespace WebApi.Controllers
                 int left_seconds = PostLeftSecods(post.post_time);
                 if (left_seconds > 0)
                 {
-                    string uncoded_txt;
-                    if (post.post_text == null)
-                    {
-                        uncoded_txt = "";
-                    }
-                    else
-                    {
-                        uncoded_txt = Tokens.GetName(post.post_text, "post");
-                    }
-
-                    return "{" + uncoded_txt + ";" + left_seconds + "}"; //sending request about user post information
+                    return "{" + post.post_text + ";" + left_seconds + "}"; //sending request about user post information
                                                            // int got_username = Convert.ToInt32(person.username);
                 }
                 else
@@ -373,7 +373,7 @@ namespace WebApi.Controllers
                     int curr_postime = PostLeftSecods(friendpostother.post_time);
                     if (friendpostother.id != null && curr_postime > 0) 
                     {
-                        find_post_res_info = find_post_res_info + "~" + Tokens.GetName(friendpostother.post_text, "post") + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak + "|" + UsersDTO.GetPrivatePost(friendpostother.id, encoded_token).post_unique_key; //getting information about post and adding it to string
+                        find_post_res_info = find_post_res_info + "~" + friendpostother.post_text + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak + "|" + UsersDTO.GetPrivatePost(friendpostother.id, encoded_token).post_unique_key; //getting information about post and adding it to string
                         find_post_res_time = find_post_res_time + "|" + curr_postime; //getting seconds, how much post will be alive
                     }
                     else
@@ -674,10 +674,12 @@ namespace WebApi.Controllers
                 List<User> find_friends = UsersDTO.LoadFriendsRequests(encoded_token); //getting all users that sent request for this user
                 if (find_friends[0].id != "-1") //there is some user requests
                 {
-                    string find_res = UsersDTO.GetUsersById(find_friends[0].id).username;
+                    var curr_user = UsersDTO.GetUsersById(find_friends[0].id);
+                    string find_res = curr_user.username + "•" + curr_user.unique_user_code;
                     for (int i = 1; i < find_friends.Count; i++)
                     {
-                        find_res = find_res + ";" + UsersDTO.GetUsersById(find_friends[i].id).username; //add incoming request username
+                        var curr_user1 = UsersDTO.GetUsersById(find_friends[i].id);
+                        find_res = find_res + ";" + curr_user1.username + "•" + curr_user1.unique_user_code; //add incoming request username
                     }
                     return "{" + find_res + "}"; //answer string of usernames incoming requests
                 }
