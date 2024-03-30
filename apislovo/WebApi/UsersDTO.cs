@@ -250,11 +250,11 @@ namespace WebApi
     public static class UsersDTO
     {
 
-        public static User UpdateAutentificator(string previous_refresh_code, string new_refresh_code)
+        public static User UpdateAutentificator(string previous_refresh_code, string new_refresh_code, string device_code)
         {
             User res = new User();
             string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
-            string query = "exec dbo.USER_UPDATE_AUTENTIFICATOR @previous_refresh_code='" + previous_refresh_code + "', @new_refresh_code='"+ new_refresh_code + "', @new_refr_datetime='"+ DateTime.Now.ToString()+"';";
+            string query = "exec dbo.USER_UPDATE_AUTENTIFICATOR @previous_refresh_code='" + previous_refresh_code + "', @new_refresh_code='"+ new_refresh_code + "', @new_refr_datetime='"+ DateTime.Now.ToString()+"', @device_token='"+ device_code + "';";
 
             using (SqlConnection con = new SqlConnection(constr))
             {

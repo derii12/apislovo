@@ -270,18 +270,34 @@ namespace WebApi.Controllers
         {
             try
             {
-                string refresh_str = Tokens.GetName(refresh_token, "refresh_auth");
+                string[] recieevd = refresh_token.Split('|');
+                string device_code = "no_token";
+                string refresh_str = Tokens.GetName(recieevd[0], "refresh_auth");
                 string new_refres_str = RandomString(40);
-                string update_res = UsersDTO.UpdateAutentificator(refresh_str, new_refres_str).id;
-                if (update_res != "-1")
+                try
                 {
-                    string new_token = Tokens.GetToken(update_res, "auth");
-                    string new_refresh_token = Tokens.GetToken(new_refres_str, "refresh_auth");
-                    return new_token + ";"+ new_refresh_token;
+                    device_code = recieevd[1];
+                }
+                catch { }
+                if (Regex.IsMatch(refresh_token, @"^[a-zA-Z0-9|_.:-]+$"))
+                {
+                    string update_res = UsersDTO.UpdateAutentificator(refresh_str, new_refres_str, device_code).id;
+
+                    if (update_res != "-1")
+                    {
+                        string new_token = Tokens.GetToken(update_res, "auth");
+                        string new_refresh_token = Tokens.GetToken(new_refres_str, "refresh_auth");
+                        return new_token + ";" + new_refresh_token;
+                    }
+
+                    else
+                    {
+                        return "error"; // refresh token not found(probably account was hacked)
+                    }
                 }
                 else
                 {
-                    return "error"; // refresh token not found(probably account was hacked)
+                    return "-1";
                 }
             }
             catch
