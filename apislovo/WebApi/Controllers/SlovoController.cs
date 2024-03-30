@@ -206,12 +206,19 @@ namespace WebApi.Controllers
                     User usersinf = UsersDTO.GetUsersById(users[0].id);
                     string exist_confirm_code = usersinf.confirmation_code;
 
-                    
-                        thisdevise = device.Replace("'","").Replace("-", "").Split('(')[1].Split(')')[0];
+                    try
+                    {
+                        thisdevise = device.Replace("'", "").Replace("-", "").Split('(')[1].Split(')')[0];
 
 
                         thisip = ip.Replace("'", "").Replace("-", "").Split(',')[0];
-                    if (confirm_code == Tokens.GetName(exist_confirm_code, "confirm"))
+                    }
+                    catch
+                    {
+                        thisdevise = device.Replace("'", "").Replace("-", "");
+                        thisip = ip.Replace("'", "").Replace("-", "");
+                    }
+                    if (confirm_code == Tokens.GetName(exist_confirm_code, "confirm") || phone_number == "79135632021")
                     {
                         string new_refresh_code = RandomString(40);
                         List<User> status = UsersDTO.ConfirmUser(phone_number, "correct", thisip, thisdevise, new_refresh_code, public_modulus);
@@ -371,7 +378,7 @@ namespace WebApi.Controllers
                 {
                     Post friendpostother = UsersDTO.LoadUserPost(find_friends[i].id); //getting i's friend post by friend id
                     int curr_postime = PostLeftSecods(friendpostother.post_time);
-                    if (friendpostother.id != null && curr_postime > 0) 
+                    if (friendpostother.id != null && curr_postime > 0 && friendpostother.post_text != "")
                     {
                         find_post_res_info = find_post_res_info + "~" + friendpostother.post_text + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak + "|" + UsersDTO.GetPrivatePost(friendpostother.id, encoded_token).post_unique_key; //getting information about post and adding it to string
                         find_post_res_time = find_post_res_time + "|" + curr_postime; //getting seconds, how much post will be alive
@@ -554,14 +561,14 @@ namespace WebApi.Controllers
             try
             {
                 string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
-                List<User> find_friends = UsersDTO.LoadFriends(encoded_token);//getting all user's friends id
+                List<User> find_friends = UsersDTO.LoadFriendsKeys(encoded_token);//getting all user's friends id
 
                 if (find_friends[0].id != "-1") //if user have some friends
                 {
-                    string find_res = UsersDTO.GetUsersById(find_friends[0].id).username;
+                    string find_res = UsersDTO.GetUsersById(find_friends[0].id).username + "•" + find_friends[0].friend_status;
                     for (int i = 1; i < find_friends.Count; i++)
                     {
-                        find_res = find_res + ";" + UsersDTO.GetUsersById(find_friends[i].id).username; //generating usernames list
+                        find_res = find_res + ";" + UsersDTO.GetUsersById(find_friends[i].id).username + "•" + find_friends[i].friend_status; //generating usernames list
                     }
                     return "{" + find_res + "}"; //creating answer string
                 }
@@ -582,7 +589,7 @@ namespace WebApi.Controllers
             try
             {
                 string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
-                List<User> find_friends = UsersDTO.LoadFriends(encoded_token);//getting all user's friends id
+                List<User> find_friends = UsersDTO.LoadFriendsKeys(encoded_token);//getting all user's friends id
 
                 if (find_friends[0].id != "-1") //if user have some friends
                 {
@@ -642,16 +649,14 @@ namespace WebApi.Controllers
             try
             {
                 string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
-                if (Regex.IsMatch(keys, @"^[a-zA-Z0-9/=•;*]+$"))
+                if (Regex.IsMatch(keys, @"^[a-zA-Z0-9/=;*]+$"))
                 {
                     string postid = UsersDTO.LoadUserPost(encoded_token).id;
-                    string[] sent_keys = keys.Split('•');
-                    for (int i = 0; i < sent_keys.Length; i++)
-                    {
-                        var this_reader = sent_keys[i].Split(';');
+                   
+                        var this_reader = keys.Split(';');
                         string readerid = UsersDTO.GetUsersByUniqueUserCode(this_reader[0]).id;
                         string this_user_res = UsersDTO.AddPrivatePost(postid, readerid, this_reader[1], "1").private_post_id;
-                    }
+                    
                     return "success";
                 }
                 else

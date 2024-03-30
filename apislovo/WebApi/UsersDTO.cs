@@ -565,7 +565,38 @@ namespace WebApi
             return users;
         }
 
+        public static List<User> LoadFriendsKeys(string uid)
+        {
+            List<User> users = new List<User>();
 
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.LOAD_FRIENDS_KEYS @uid = " + uid + ";";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            users.Add(new User
+                            {
+                                id = sdr["idrcv"].ToString(),
+                                friend_status = sdr["status"].ToString()
+                            }); ;
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return users;
+        }
         public static List<User> LoadFriendsRequests(string uid)
         {
             List<User> users = new List<User>();
