@@ -1020,7 +1020,41 @@ namespace WebApi
         }
 
 
+        public static List<Reaction> LoadPostReactions(string post_id)
+        {
+            List<Reaction> reacts = new List<Reaction>();
 
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.LOAD_POST_REACTION @post_id =" + post_id;
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            reacts.Add(new Reaction
+                            {
+                                id = sdr["reactid"].ToString(),
+                                post_id = sdr["post_id"].ToString(),
+                                author_id = sdr["author_id"].ToString(),
+                                reaction_text = sdr["react_txt"].ToString(),
+                                reaction_datetime = sdr["react_datetime"].ToString()
+                            }); ;
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return reacts;
+        }
 
         public static List<User> InsertUser(string phone_number, string username, string confirm_code, string newinviter, string confirm_code_creating, string unique_user_code)
         {

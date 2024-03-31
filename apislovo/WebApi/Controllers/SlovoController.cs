@@ -335,6 +335,42 @@ namespace WebApi.Controllers
             }
         }
 
+        [HttpGet("load_post_reactions")]
+        public string load_post_reactions(string token, string post_author, string ip, string device) //load autor's post
+        {
+
+            try
+            {
+                if (Regex.IsMatch(post_author, @"^[a-zA-Z0-9/=•;*]+$"))
+                {
+                    string encodedtoken = Tokens.GetName(token, "auth");
+                    User post = UsersDTO.GetUsersByUniqueUserCode(post_author); // load post info by uesr id
+                    List<Reaction> reacts = UsersDTO.LoadPostReactions(post.id);
+                    string res = "";
+                    if (reacts[0].id != "-1")
+                    {
+                        foreach (var elem in reacts)
+                        {
+                            res = res + "|" + UsersDTO.GetUsersById(elem.author_id).username + "•" + elem.reaction_text + "•" +elem.reaction_datetime;
+                             //sending request about user post information
+                        }
+                        return res;// int got_username = Convert.ToInt32(person.username);
+                    }
+                    else
+                    {
+                        return "-1";
+                    }
+                }
+                else
+                {
+                    return "-1";
+                }
+            }
+            catch
+            {
+                return "error";
+            }
+        }
 
         [HttpGet("new_post")]
         public string new_post(string token, string post_text, string ip, string device) //creating new post for this user
