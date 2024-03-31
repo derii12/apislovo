@@ -52,6 +52,23 @@ namespace WebApi
 
     }
 
+    public class Reaction
+    {
+
+        public string id { get; set; }
+
+        public string author_id { get; set; }
+
+        public string post_id { get; set; }
+
+        public string reaction_text { get; set; }
+
+        public string reaction_datetime { get; set; }
+
+
+    }
+
+
     public class PrivatePost
     {
         public string private_post_id { get; set; }
@@ -310,6 +327,34 @@ namespace WebApi
 
 
             return users;
+        }
+        public static Reaction NewPostReaction(string author_id, string post_id, string react_txt)
+        {
+            Reaction res = new Reaction();
+            string post_time = DateTime.Now.ToString();
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.NEW_USER_REACTION @uid = " + author_id + ", @post_id = " + post_id + ", @react_txt = '" + react_txt + "', @react_datetime='"+post_time+ "';";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            res.id = sdr["reactid"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return res;
         }
 
         public static List<User> CreateConfirm(string phone_number, string confirm_code_creating)
