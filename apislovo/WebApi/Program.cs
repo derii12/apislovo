@@ -1,3 +1,5 @@
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 using Identity.Models;
 using Identity.Seeds;
 using Microsoft.AspNetCore.Hosting;
@@ -20,6 +22,10 @@ namespace WebApi
         public async static Task Main(string[] args)
         {
             var host = CreateHostBuilder(args).Build();
+            FirebaseApp.Create(new AppOptions()
+            {
+                Credential = GoogleCredential.FromFile("private_key.json")
+            });
             using (var scope = host.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;

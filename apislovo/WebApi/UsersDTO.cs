@@ -34,6 +34,8 @@ namespace WebApi
         public string unique_user_code { get; set; }    
 
         public string user_public_key { get; set; }
+
+        public string device_token { get; set; }
     }
 
 
@@ -60,7 +62,22 @@ namespace WebApi
 
         public string visibility { get; set; }
     }
+    public class Reaction
+    {
 
+        public string id { get; set; }
+
+        public string author_id { get; set; }
+
+        public string post_id { get; set; }
+
+        public string reaction_text { get; set; }
+
+        public string reaction_datetime { get; set; }
+
+        public string react_unique_key { get; set; }
+
+    }
 
     public class AuthOptions
     {
@@ -278,8 +295,68 @@ namespace WebApi
 
             return res;
         }
+        public static Reaction NewPostReaction(string author_id, string post_id, string react_txt)
+        {
+            Reaction res = new Reaction();
+            string post_time = DateTime.Now.ToString();
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.NEW_USER_REACTION @uid = " + author_id + ", @post_id = " + post_id + ", @react_txt = '" + react_txt + "', @react_datetime='" + post_time + "';";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            res.id = sdr["reactid"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+            return res;
+        }
+
+        public static List<Reaction> LoadPostReactions(string post_id)
+        {
+            List<Reaction> reacts = new List<Reaction>();
+
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.LOAD_POST_REACTION @post_id =" + post_id;
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            reacts.Add(new Reaction
+                            {
+                                id = sdr["reactid"].ToString(),
+                                post_id = sdr["post_id"].ToString(),
+                                author_id = sdr["author_id"].ToString(),
+                                reaction_text = sdr["react_txt"].ToString(),
+                                reaction_datetime = sdr["react_datetime"].ToString()
+                            }); ;
+                        }
+                    }
+                    con.Close();
+                }
+            }
 
 
+            return reacts;
+        }
         public static List<User> GetUsers(string phone_number)
         {
             List<User> users = new List<User>();
@@ -366,6 +443,36 @@ namespace WebApi
                             res.phone = sdr["phone"].ToString();
                             res.confirmation_code = sdr["confirm_code"].ToString();
                             res.unique_user_code = sdr["personal_code"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return res;
+        }
+
+
+        public static User GetUserLogById(string uid)
+        {
+            User res = new User();
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.USER_GET_LOG @id=" + uid + ";";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            res.id = sdr["uid"].ToString();
+                            res.device_token = sdr["device_token"].ToString();
                         }
                     }
                     con.Close();
@@ -694,6 +801,37 @@ namespace WebApi
         }
 
 
+        public static Reaction GetPrivateReact(string react_id, string reader_id)
+        {
+            Reaction react = new Reaction();
+
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.GET_PRIVATE_REACT @react_id = " + react_id + ", @reader_id = " + reader_id + ";";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            react.id = sdr["react_id"].ToString();
+                            react.react_unique_key = sdr["private_react_key"].ToString();
+                      
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return react;
+        }
+
         public static PrivatePost GetPrivatePost(string post_id, string reader_id)
         {
             PrivatePost posts = new PrivatePost();
@@ -744,6 +882,35 @@ namespace WebApi
                         while (sdr.Read())
                         {
                             posts.private_post_id = sdr["private_post_id"].ToString();
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return posts;
+        }
+
+        public static PrivatePost AddPrivateReact(string react_author_id, string react_post_id, string react_reader_id, string react_encoded_key)
+        {
+            PrivatePost posts = new PrivatePost();
+
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.ADD_PRIVATE_REACT @react_post = " + react_author_id + ", @react_author = " + react_post_id + ", @reader_id = " + react_reader_id + ", @encoder_key = '" + react_encoded_key + "';";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            posts.private_post_id = sdr["private_react_id"].ToString();
                         }
                     }
                     con.Close();

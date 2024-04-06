@@ -45,6 +45,7 @@ using Microsoft.AspNetCore.Http.Extensions;
 using GraphQLParser;
 using System.Reactive.Joins;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Reactive;
 
 namespace WebApi.Controllers
 {
@@ -63,6 +64,7 @@ namespace WebApi.Controllers
         [HttpGet("Phone_number_checking")]  // checking for user by phone number, and sanding confirm call if user is alredy in database
         async public Task<string> Phone_number_checking(string phone_number, string ip, string device)
         {
+           
             bool isAlpha = phone_number.All(Char.IsDigit);
             if (isAlpha)
             {
@@ -254,7 +256,7 @@ namespace WebApi.Controllers
                 User person = UsersDTO.GetUsersById(encoded_token); //geting info about user
                 User pesoncode = UsersDTO.LoadUserInvite(encoded_token); //getting invite code for this user
                 User userstreak = UsersDTO.GetUsersStreak(encoded_token); //getting streak of current user
-                return person.username + ";" + pesoncode.invite_code + ";" + userstreak.streak;
+                return person.username + ";" + pesoncode.invite_code + ";" + userstreak.streak + ";" + person.unique_user_code;
                 // int got_username = Convert.ToInt32(person.username);
             }
             catch
@@ -306,6 +308,10 @@ namespace WebApi.Controllers
                 return "-1"; //wrong token error code
             }
         }
+        public async void sender_notufy_post(string username, string devicee)
+        {
+            Notifications.NotificationSend("New post", username + " shared a post", devicee);
+        }
 
         [HttpGet("new_post")]
         public string new_post(string token, string post_text, string ip, string device) //creating new post for this user
@@ -318,8 +324,28 @@ namespace WebApi.Controllers
                 {
 
 
-
+                    string username = UsersDTO.GetUsersById(encoded_token).username;
+                    if (post_text == "*")
+                    {
+                        post_text = "";
+                    }
                     Post new_post = UsersDTO.NewUserPost(encoded_token, post_text); //creating new post for this user (new post text)
+                    List<User> friends = UsersDTO.LoadFriendsKeys(encoded_token);
+                    if (post_text != "") {
+                        foreach (var elem in friends)
+                        {
+                            string devicee = UsersDTO.GetUserLogById(elem.id).device_token;
+                            try {
+                                sender_notufy_post(username,devicee);
+
+
+                            }
+                            catch {
+
+                                string a = "dd";
+                            }
+                        }
+                    }
                     return "success"; // post created succesfull
 
                 }
@@ -390,6 +416,7 @@ namespace WebApi.Controllers
                 Post friendpost = UsersDTO.LoadUserPost(find_friends[0].id);//trying to get post of first friend in the list
                 string find_post_res_info = ""; //information of post string(post text, key, author, streak)
                 string find_post_res_time = ""; // information of post time (how much seconds post will be alive)
+                string find_post_res_authors = ""; // information of post time (how much seconds post will be alive)
                 for (int i = 0; i < find_friends.Count; i++)//checking for another friends post 
                 {
                     Post friendpostother = UsersDTO.LoadUserPost(find_friends[i].id); //getting i's friend post by friend id
@@ -398,6 +425,7 @@ namespace WebApi.Controllers
                     {
                         find_post_res_info = find_post_res_info + "~" + friendpostother.post_text + "|" + UsersDTO.GetUsersById(friendpostother.id).username + "|" + UsersDTO.GetUsersStreak(friendpostother.id).streak + "|" + UsersDTO.GetPrivatePost(friendpostother.id, encoded_token).post_unique_key; //getting information about post and adding it to string
                         find_post_res_time = find_post_res_time + "|" + curr_postime; //getting seconds, how much post will be alive
+                        find_post_res_authors = find_post_res_authors + "|" + UsersDTO.GetUsersById(find_friends[i].id).unique_user_code;
                     }
                     else
                     {
@@ -413,7 +441,7 @@ namespace WebApi.Controllers
                     //refresh(ip, device); 
                     find_post_res_info = find_post_res_info.Remove(0, 1);
                     find_post_res_time = find_post_res_time.Remove(0, 1);
-                    return find_post_res_info + "•" + find_post_res_time; //creating answer which consist all information about user's friends posts
+                    return find_post_res_info + "•" + find_post_res_time + "•" + find_post_res_authors; //creating answer which consist all information about user's friends posts
                 }
             }
             catch
@@ -433,8 +461,18 @@ namespace WebApi.Controllers
                 {
                     string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
                     List<User> find_users = UsersDTO.AddFriend(encoded_token, username); //adding friend with this username
-                    if (find_users[0].id != "-2" && find_users[0].id != "-1") //checking for adding errrors
+                    string fid = find_users[0].id;
+                    if (fid != "-2" && fid != "-1") //checking for adding errrors
                     {
+                        try
+                        {
+                            string devicee = UsersDTO.GetUserLogById(fid).device_token;
+                            Notifications.NotificationSend("New friend request!", username + " want to be your friend", devicee);
+                        }
+                        catch
+                        {
+
+                        }
                         return "success";
                     }
                     else
@@ -659,6 +697,74 @@ namespace WebApi.Controllers
             }
         }
 
+        [HttpGet("new_post_reaction")]
+        public string new_post_reaction(string token, string post_author, string reaction_txt, string ip, string device) //creating new post for this user
+        {
+            try
+            {
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+
+                if (Regex.IsMatch(reaction_txt, @"^[a-zA-Z0-9/=•;*]+$"))
+                {
+
+
+                    string this_post_author = UsersDTO.GetUsersByUniqueUserCode(post_author).id;
+                    User thiss = UsersDTO.GetUsersById(this_post_author);
+                    
+                    Reaction new_post = UsersDTO.NewPostReaction(encoded_token, this_post_author, reaction_txt); //creating new post for this user (new post text)
+                    return "success"; // post created succesfull
+
+                }
+                else
+                {
+                    return "-1";
+                }
+                // int got_username = Convert.ToInt32(person.username);
+            }
+            catch
+            {
+                return "error"; //wrong token error code
+            }
+        }
+
+        [HttpGet("load_post_reactions")]
+        public string load_post_reactions(string token, string post_author, string ip, string device) //load autor's post
+        {
+
+            try
+            {
+                if (Regex.IsMatch(post_author, @"^[a-zA-Z0-9/=•;*]+$"))
+                {
+                    string encodedtoken = Tokens.GetName(token, "auth");
+                    User post = UsersDTO.GetUsersByUniqueUserCode(post_author); // load post info by uesr id
+                    List<Reaction> reacts = UsersDTO.LoadPostReactions(post.id);
+                    string res = "";
+                    if (reacts[0].id != "-1")
+                    {
+                        foreach (var elem in reacts)
+                        {
+                            res = res + "|" + UsersDTO.GetUsersById(elem.author_id).username + "•" + elem.reaction_text + "•" + elem.reaction_datetime + "•" + UsersDTO.GetPrivateReact(elem.id,encodedtoken).react_unique_key;
+                            //sending request about user post information
+                        }
+                        return res;// int got_username = Convert.ToInt32(person.username);
+                    }
+                    else
+                    {
+                        return "-1";
+                    }
+                }
+                else
+                {
+                    return "-1";
+                }
+            }
+            catch
+            {
+                return "error";
+            }
+        }
+
+
         [HttpGet("new_private_posts")]
         public string load_friends_public_keys(string token, string keys, string ip, string device) //getting all friends usernames of this user
         {
@@ -668,11 +774,57 @@ namespace WebApi.Controllers
                 if (Regex.IsMatch(keys, @"^[a-zA-Z0-9/=;*]+$"))
                 {
                     string postid = UsersDTO.LoadUserPost(encoded_token).id;
-                   
+                    string this_user_res = "";
                         var this_reader = keys.Split(';');
+                    if (this_reader[0] == "me")
+                    {
+                        this_user_res = UsersDTO.AddPrivatePost(postid, postid, this_reader[1], "1").private_post_id;
+                    }
+                    else
+                    {
                         string readerid = UsersDTO.GetUsersByUniqueUserCode(this_reader[0]).id;
-                        string this_user_res = UsersDTO.AddPrivatePost(postid, readerid, this_reader[1], "1").private_post_id;
+                        this_user_res = UsersDTO.AddPrivatePost(postid, readerid, this_reader[1], "1").private_post_id;
+                    }
                     
+                    return "success";
+                }
+                else
+                {
+                    return "-1";
+                }
+            }
+            catch
+            {
+                return "error"; // wrong token
+            }
+        }
+
+
+        [HttpGet("new_private_reacts")]
+        public string load_friends_public_keys_reacts(string token, string keys, string ip, string device) //getting all friends usernames of this user
+        {
+            try
+            {
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+                if (Regex.IsMatch(keys, @"^[a-zA-Z0-9/=;*]+$"))
+                {
+                    var this_reader = keys.Split(';');
+                    string react_post_id = UsersDTO.GetUsersByUniqueUserCode(this_reader[0]).id;
+                    
+                    string react_personaly_encoded = this_reader[2];
+                    string this_user_res = "";
+                  
+                    if (this_reader[1] == "me")
+                    {
+                        this_user_res = UsersDTO.AddPrivateReact(encoded_token, react_post_id, encoded_token, react_personaly_encoded).private_post_id;
+                    }
+                    else
+                    {
+                        string react_reader = UsersDTO.GetUsersByUniqueUserCode(this_reader[1]).id;
+                        string readerid = UsersDTO.GetUsersByUniqueUserCode(this_reader[0]).id;
+                        this_user_res = UsersDTO.AddPrivateReact(encoded_token, react_post_id, react_reader, react_personaly_encoded).private_post_id;
+                    }
+
                     return "success";
                 }
                 else
