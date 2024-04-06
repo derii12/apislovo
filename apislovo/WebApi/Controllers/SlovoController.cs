@@ -313,6 +313,71 @@ namespace WebApi.Controllers
             Notifications.NotificationSend("New post", username + " shared a post", devicee);
         }
 
+        [HttpGet("new_post_reaction")]
+        public string new_post_reaction(string token, string post_author,string reaction_txt, string ip, string device) //creating new post for this user
+        {
+            try
+            {
+                string encoded_token = Tokens.GetName(token, "auth"); //get encoded token (user id)
+
+                if (Regex.IsMatch(reaction_txt, @"^[a-zA-Z0-9/=•;*]+$"))
+                {
+
+
+                    string this_post_author = UsersDTO.GetUsersByUniqueUserCode(post_author).id;
+                    Reaction new_post = UsersDTO.NewPostReaction(encoded_token, this_post_author, reaction_txt); //creating new post for this user (new post text)
+                    return "success"; // post created succesfull
+
+                }
+                else
+                {
+                    return "-1";
+                }
+                // int got_username = Convert.ToInt32(person.username);
+            }
+            catch
+            {
+                return "error"; //wrong token error code
+            }
+        }
+
+        [HttpGet("load_post_reactions")]
+        public string load_post_reactions(string token, string post_author, string ip, string device) //load autor's post
+        {
+
+            try
+            {
+                if (Regex.IsMatch(post_author, @"^[a-zA-Z0-9/=•;*]+$"))
+                {
+                    string encodedtoken = Tokens.GetName(token, "auth");
+                    User post = UsersDTO.GetUsersByUniqueUserCode(post_author); // load post info by uesr id
+                    List<Reaction> reacts = UsersDTO.LoadPostReactions(post.id);
+                    string res = "";
+                    if (reacts[0].id != "-1")
+                    {
+                        foreach (var elem in reacts)
+                        {
+                            res = res + "|" + UsersDTO.GetUsersById(elem.author_id).username + "•" + elem.reaction_text + "•" +elem.reaction_datetime;
+                             //sending request about user post information
+                        }
+                        return res;// int got_username = Convert.ToInt32(person.username);
+                    }
+                    else
+                    {
+                        return "-1";
+                    }
+                }
+                else
+                {
+                    return "-1";
+                }
+            }
+            catch
+            {
+                return "error";
+            }
+        }
+
         [HttpGet("new_post")]
         public string new_post(string token, string post_text, string ip, string device) //creating new post for this user
         {
