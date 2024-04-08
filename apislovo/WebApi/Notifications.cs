@@ -16,11 +16,13 @@ namespace WebApi
             // See documentation on defining a message payload.
             var message = new Message()
             {
+                
                 Data = new Dictionary<string, string>()
     {
         { "myData", "1337" },
     },
                 Token = registrationToken,
+                
                // Topic = "all",
                 Notification = new Notification()
                 {
