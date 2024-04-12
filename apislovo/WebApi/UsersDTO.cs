@@ -334,6 +334,36 @@ namespace WebApi
 
             return users;
         }
+        public static string NotificationNew(string type)
+        {
+            string res = "";
+            string post_time = DateTime.Now.ToString();
+            string constr = @"workstation id=ms-sql-9.in-solve.ru;packet size=4096;user id=1gb_zevent2;pwd=24zea49egh;data source=ms-sql-9.in-solve.ru;persist security info=False;initial catalog=1gb_mindshare;Connection Timeout=300";
+            string query = "exec dbo.NEW_USER_NOTIFIC @type = '" + type + "',@time='"+ post_time + "';";
+
+            using (SqlConnection con = new SqlConnection(constr))
+            {
+                using (SqlCommand cmd = new SqlCommand(query))
+                {
+
+                    cmd.Connection = con;
+                    con.Open();
+                    using (SqlDataReader sdr = cmd.ExecuteReader())
+                    {
+                        while (sdr.Read())
+                        {
+                            
+                                res = sdr["notification_id"].ToString()
+                             ;
+                        }
+                    }
+                    con.Close();
+                }
+            }
+
+
+            return res;
+        }
         public static Reaction NewPostReaction(string author_id, string post_id, string react_txt)
         {
             Reaction res = new Reaction();

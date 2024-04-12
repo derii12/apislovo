@@ -46,6 +46,7 @@ using GraphQLParser;
 using System.Reactive.Joins;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using System.Reactive;
+using System.Security.Cryptography;
 
 namespace WebApi.Controllers
 {
@@ -267,7 +268,6 @@ namespace WebApi.Controllers
         }
 
 
-        [HttpGet("user_autentification")] // getting info about this user(username,invitecode,streaks)
         public string user_autentification(string refresh_token, string ip, string device)
         {
             try
@@ -287,8 +287,21 @@ namespace WebApi.Controllers
 
                     if (update_res != "-1")
                     {
-                        string new_token = Tokens.GetToken(update_res, "auth");
-                        string new_refresh_token = Tokens.GetToken(new_refres_str, "refresh_auth");
+                        string new_token = "";
+                        string new_refresh_token = "";
+                        string stat = "";
+                        if (update_res == "-2")
+                        {
+                            new_token = "none";
+                            new_refresh_token = Tokens.GetToken(refresh_str, "refresh_auth");
+
+                        }
+                        else
+                        {
+                            new_token = Tokens.GetToken(update_res, "auth");
+                            new_refresh_token = Tokens.GetToken(new_refres_str, "refresh_auth");
+                        }
+
                         return new_token + ";" + new_refresh_token;
                     }
 
@@ -310,6 +323,7 @@ namespace WebApi.Controllers
         }
         public async void sender_notufy_post(string username, string devicee)
         {
+
             Notifications.NotificationSend("New post", username + " shared a post", devicee);
         }
 
@@ -328,7 +342,14 @@ namespace WebApi.Controllers
                     string username = UsersDTO.GetUsersById(encoded_token).username;
                     string user_device = UsersDTO.GetUserLogById(this_post_author).device_token;
                     try {
-                        Notifications.NotificationSend(username,"Just reacted to your post", user_device);
+                        if (reaction_txt != "*")
+                        {
+                            string send_notif = UsersDTO.NotificationNew("PR_" + encoded_token + "_TO_" + this_post_author);
+                            if (send_notif == "1")
+                            {
+                                Notifications.NotificationSend(username, "Just reacted to your post", user_device);
+                            }
+                        }
                     }
                     catch
                     {
@@ -374,8 +395,12 @@ namespace WebApi.Controllers
                         foreach (var elem in friends)
                         {
                             string devicee = UsersDTO.GetUserLogById(elem.id).device_token;
-                            try {
-                                sender_notufy_post(username,devicee);
+                            try
+                            {
+                                string send_notif = UsersDTO.NotificationNew("NP_" + encoded_token + "_TO_" + elem.id);
+                                if (send_notif == "1") { 
+                                    sender_notufy_post(username, devicee);
+                            }
 
 
                             }
@@ -535,7 +560,11 @@ namespace WebApi.Controllers
                         try
                         {
                             string devicee = UsersDTO.GetUserLogById(fid).device_token;
-                            Notifications.NotificationSend("New friend request!", username + " want to be your friend", devicee);
+                            string send_notif = UsersDTO.NotificationNew("FR_"+encoded_token+"_TO_"+fid);
+                            if (send_notif == "1")
+                            {
+                                Notifications.NotificationSend("New friend request!", username + " want to be your friend", devicee);
+                            }
                         }
                         catch
                         {
@@ -782,8 +811,12 @@ namespace WebApi.Controllers
                     {
                         foreach (var elem in reacts)
                         {
-                            res = res + "|" + UsersDTO.GetUsersById(elem.author_id).username + "•" + elem.reaction_text + "•" + elem.reaction_datetime + "•" + UsersDTO.GetPrivateReact(elem.id,encodedtoken).react_unique_key;
-                            //sending request about user post information
+                            User thiss = UsersDTO.GetUsersById(elem.author_id);
+                            if (elem.reaction_text != "*")
+                            {
+                                res = res + "|" + thiss.username + "•" + elem.reaction_text + "•" + elem.reaction_datetime + "•" + UsersDTO.GetPrivateReact(elem.id, encodedtoken).react_unique_key + "•" + thiss.unique_user_code;
+                                //sending request about user post information
+                            }
                         }
                         return res;// int got_username = Convert.ToInt32(person.username);
                     }
