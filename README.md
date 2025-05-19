@@ -1,2 +1,2 @@
 Это серверная часть приложения Brief.
-Основные функции реализованы в файлах SlovoController.cs и Class.cs
+Основные функции реализованы в файлах apislovo/Vodels/SlovoController.cs и apislovo/Class.cs
